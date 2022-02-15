@@ -26,9 +26,19 @@ import android.webkit.ValueCallback
 import android.webkit.WebView
 
 import android.webkit.WebChromeClient
+import android.widget.Toast
 
+import android.app.DownloadManager
+import android.content.ContentValues.TAG
 
+import android.os.Environment
+import android.util.Log
 
+import android.webkit.DownloadListener
+
+import android.webkit.WebViewClient
+import java.io.UnsupportedEncodingException
+import java.net.URLDecoder
 
 
 class MainActivity : AppCompatActivity() {
@@ -44,7 +54,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         webView = findViewById(R.id.webview1)
-        
+        webView.setDownloadListener()
         
         // 사진 업로드 허용
         webView.setWebChromeClient(object : WebChromeClient() { @TargetApi(Build.VERSION_CODES.LOLLIPOP)
@@ -68,6 +78,58 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
+        // 사진 다운로드
+
+        class MyWebViewClient : WebViewClient(), DownloadListener {
+            override fun onDownloadStart(
+                url: String,
+                userAgent: String,
+                contentDisposition: String,
+                mimeType: String,
+                contentLength: Long
+            ) {
+                var contentDisposition = contentDisposition
+                Log.d(TAG, "***** onDownloadStart()")
+                Log.d(TAG, "***** onDownloadStart() - url : $url")
+                Log.d(TAG, "***** onDownloadStart() - userAgent : $userAgent")
+                Log.d(TAG, "***** onDownloadStart() - contentDisposition : $contentDisposition")
+                Log.d(TAG, "***** onDownloadStart() - mimeType : $mimeType")
+
+                //권한 체크
+//          if(권한 여부) {
+                //권한이 있으면 처리
+                val request = DownloadManager.Request(Uri.parse(url))
+                try {
+                    contentDisposition = URLDecoder.decode(contentDisposition, "UTF-8")
+                } catch (e: UnsupportedEncodingException) {
+                    e.printStackTrace()
+                }
+                contentDisposition =
+                    contentDisposition.substring(0, contentDisposition.lastIndexOf(";"))
+                request.setMimeType(mimeType)
+
+                //------------------------COOKIE!!------------------------
+                val cookies = CookieManager.getInstance().getCookie(url)
+                request.addRequestHeader("cookie", cookies)
+                //------------------------COOKIE!!------------------------
+                request.addRequestHeader("User-Agent", userAgent)
+                request.setDescription("Downloading file...")
+                request.setTitle(URLUtil.guessFileName(url, contentDisposition, mimeType))
+                request.allowScanningByMediaScanner()
+                request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                request.setDestinationInExternalPublicDir(
+                    Environment.DIRECTORY_DOWNLOADS,
+                    URLUtil.guessFileName(url, contentDisposition, mimeType)
+                )
+                val dm = getSystemService(DOWNLOAD_SERVICE) as DownloadManager
+                dm.enqueue(request)
+                Toast.makeText(applicationContext, "파일을 다운로드합니다.", Toast.LENGTH_LONG).show()
+
+//          } else {
+                //권한이 없으면 처리
+//          }
+            }
+        }
 
         webView.apply {
             webViewClient = WebViewClientClass() // new WebViewClient()); //클릭시 새창 안뜨게
